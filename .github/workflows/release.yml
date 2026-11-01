@@ -79,7 +79,6 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: pip
 
       # Proves the bundle is installable as shipped: the example must contain every
       # secret the config asks for, and the config must resolve from the bundle folder.
