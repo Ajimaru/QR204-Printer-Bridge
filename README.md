@@ -43,6 +43,20 @@ position. A 64 KB UART ring buffer takes a whole screen print, so the sender is 
 The printer's firmware deviates from its manual in several places, and it is permanently in GB18030 mode.
 Both measured quirks and the character conversion that works around them are documented in the wiki.
 
+## Installation
+
+The firmware is compiled on your own machine; there is no prebuilt `.bin`, because the WiFi credentials and the
+API key are compiled in. What you download is the ESPHome config bundle:
+
+1. Download `QR204-Printer-Bridge-<version>.zip` from the [Releases page](https://github.com/Ajimaru/QR204-Printer-Bridge/releases) and unpack it.
+2. Copy `secrets.yaml.example` to `secrets.yaml` and fill in the five values.
+3. Put `thermal-printer.yaml`, `printer_bridge.h` and `secrets.yaml` in one folder and flash the ESP32-C3 with
+   ESPHome (Device Builder, or `esphome run thermal-printer.yaml`).
+
+Wiring, power supply and the first tests are in the wiki. Start with the
+[Setup Guide](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Setup-Guide) for the full steps and the [Assembly Guide](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Assembly-Guide)
+before powering anything up: both buck converters must be set with a multimeter first.
+
 ## Documentation
 
 The complete build and maintenance documentation is in the wiki:
@@ -67,6 +81,7 @@ The wiki pages are generated from [`docs/`](docs/) in this repository; see [Docu
 | --- | --- |
 | [`esphome/thermal-printer.yaml`](esphome/thermal-printer.yaml) | ESPHome config of the C3 bridge |
 | [`esphome/printer_bridge.h`](esphome/printer_bridge.h) | TCP port 9100 ↔ UART bridge, status polling, test page |
+| [`esphome/secrets.yaml.example`](esphome/secrets.yaml.example) | Template for the `secrets.yaml` the config needs |
 | [`datasheets/`](datasheets/) | QR204 manual (Chinese): pinout, ESC/POS command set |
 | [`Thermal Printer Housing/`](Thermal%20Printer%20Housing/) | Housing and lid STLs |
 | [`docs/`](docs/) | Wiki source, published by the `wiki-sync` workflow |
