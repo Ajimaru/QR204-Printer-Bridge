@@ -44,7 +44,8 @@ firmware, so a ready-made image would either not connect or carry somebody else'
    The first build downloads the ESP-IDF toolchain and takes several minutes. Later updates go over the air:
    `esphome run thermal-printer.yaml --device thermal-printer.local`.
 5. **Home Assistant (optional).** The device shows up under Settings → Devices & services → ESPHome. Enter the
-   `api_encryption_key` when asked.
+   `api_encryption_key` when asked. The device page lists the firmware version, which is the release the config
+   came from.
 
 To print screens from the [`airquality` sensor box](https://github.com/Ajimaru/Sensor-Box-Enhanced), that device
 needs its own client include and a reflash. Both belong to its repository, not to this one.
