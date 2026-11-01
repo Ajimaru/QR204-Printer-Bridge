@@ -1,0 +1,612 @@
+# QR204 thermal printer bridge: ESP32-C3 wired to the printer's TTL serial port, reachable as a raw network
+# printer (ESC/POS over TCP port 9100). The sensor box (airquality, a separate project) prints its screens
+# through it; its web UI entity "Printer Host" holds this device's address (default thermal-printer.local).
+# Hardware, wiring and tests: the project wiki (Assembly Guide, Setup Guide). The TCP <-> UART bridge is
+# printer_bridge.h, which must sit next to this YAML on the HA host (/homeassistant/esphome/).
+
+substitutions:
+  name: thermal-printer
+  friendly_name: thermal-printer
+  # QR204 serial port: baud rate from the self-test page (hold FEED while powering on).
+  printer_baud: "9600"
+  # C3 TX -> printer RX (connector pin 3), printer TX (connector pin 2) -> C3 RX.
+  # Not GPIO20/21: the ROM bootloader prints its boot messages on GPIO21, which the printer would print.
+  printer_tx_pin: "7"
+  printer_rx_pin: "6"
+  printer_tcp_port: "9100"
+  # WS2812B status LED (DIN), powered from the C3's 3V3 pin.
+  status_led_pin: "10"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2025.5.0
+  name_add_mac_suffix: false
+  includes:
+    - printer_bridge.h
+  on_boot:
+    # After WiFi setup (250), so lwIP is up when the bridge task opens its port.
+    - priority: 200
+      then:
+        - lambda: printer_bridge::begin(${printer_tx_pin}, ${printer_rx_pin}, ${printer_baud}, ${printer_tcp_port});
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: esp-idf
+
+# USB serial/JTAG (the C3 default), so the UART pins stay free.
+logger:
+  level: DEBUG
+
+api:
+  # Keep running without an API client; print jobs arrive over TCP, not through Home Assistant.
+  reboot_timeout: 0s
+  encryption:
+    # Reuses another device's key on this host (user's choice); HA stores it per device.
+    key: !secret api_encryption_key
+  actions:
+    # Home Assistant: action "esphome.thermal_printer_print_text" with data {message: "..."}.
+    # ("text" is a reserved name in ESPHome.)
+    - action: print_text
+      variables:
+        message: string
+      then:
+        - lambda: printer_bridge::print_text(message);
+
+ota:
+  - platform: esphome
+
+# DHCP; reachable as thermal-printer.local (mDNS), which is how clients address it.
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: ${name}
+    password: !secret wifi_password
+
+captive_portal:
+
+# Web UI; credentials shared with the other ESPHome devices on this host (user's choice).
+web_server:
+  port: 80
+  version: 3
+  auth:
+    type: digest
+    username: !secret web_server_username
+    password: !secret web_server_password
+  # Own section at the top for the printer entities (otherwise split into "Configuration"/"Diagnostic").
+  sorting_groups:
+    - id: web_group_printer
+      name: "Printer"
+      sorting_weight: -10
+
+# Debug
+debug:
+  update_interval: 5s
+
+# Time for the sun position ("LED Night Off"), from SNTP. Works without Home Assistant.
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: "Europe/Berlin"
+    servers: "pool.ntp.org"
+
+# Sun position for "LED Night Off". The location comes from the web UI ("Latitude"/"Longitude" numbers, set at
+# runtime), so it stays out of the repo; 0 / 0 here is only the placeholder until those are restored.
+sun:
+  id: sun_position
+  time_id: sntp_time
+  latitude: 0
+  longitude: 0
+
+binary_sensor:
+  - platform: template
+    name: "Printer Online"
+    device_class: connectivity
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 2
+    lambda: return printer_bridge::online();
+  - platform: template
+    name: "Printer Paper Out"
+    device_class: problem
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 3
+    lambda: return printer_bridge::paper_out();
+  - platform: template
+    name: "Print Client Connected"
+    icon: "mdi:lan-connect"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 5
+    lambda: return printer_bridge::client_connected;
+
+text_sensor:
+  # Published by the interval below when it changes.
+  - platform: template
+    name: "Printer Status"
+    id: printer_status
+    icon: "mdi:printer-pos"
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 1
+
+  # Next sunrise/sunset: "LED Night Off" switches at these times. Empty until SNTP has the time.
+  - platform: template
+    name: "Next Sunrise"
+    id: next_sunrise
+    icon: "mdi:weather-sunset-up"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 26
+    update_interval: 60s
+    lambda: |-
+      if (id(sun_latitude).state == 0 && id(sun_longitude).state == 0) return {"Location not set"};
+      auto t = id(sun_position).sunrise(-0.833);
+      if (!t.has_value()) return {""};
+      char buf[ESPTime::STRFTIME_BUFFER_SIZE];
+      return std::string(buf, t->strftime_to(buf, "%a %H:%M"));
+  - platform: template
+    name: "Next Sunset"
+    id: next_sunset
+    icon: "mdi:weather-sunset-down"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 27
+    update_interval: 60s
+    lambda: |-
+      if (id(sun_latitude).state == 0 && id(sun_longitude).state == 0) return {"Location not set"};
+      auto t = id(sun_position).sunset(-0.833);
+      if (!t.has_value()) return {""};
+      char buf[ESPTime::STRFTIME_BUFFER_SIZE];
+      return std::string(buf, t->strftime_to(buf, "%a %H:%M"));
+  # Where to get the coordinates (the web UI can't show links, so the address is the text).
+  - platform: template
+    name: "Location Help"
+    icon: "mdi:map-search"
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 30
+    update_interval: 1h
+    lambda: |-
+      return {"https://www.openstreetmap.org: search your address, right-click on the spot, "
+              "\"Show address\", copy the two numbers (latitude, longitude)"};
+
+  - platform: debug
+    device:
+      name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"
+
+sensor:
+  - platform: template
+    name: "Print Jobs"
+    icon: "mdi:counter"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 6
+    update_interval: 30s
+    lambda: return printer_bridge::jobs;
+  - platform: template
+    name: "Printed Bytes"
+    icon: "mdi:counter"
+    unit_of_measurement: B
+    accuracy_decimals: 0
+    state_class: total_increasing
+    entity_category: diagnostic
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 7
+    update_interval: 30s
+    lambda: return printer_bridge::bytes;
+
+  # Debug Sensors (the C3 has no PSRAM)
+  - platform: debug
+    free:
+      name: "Heap Free (Bytes)"
+      id: heap_free
+      disabled_by_default: True
+    block:
+      name: "Heap Max Block (Bytes)"
+      id: heap_block
+      disabled_by_default: True
+    loop_time:
+      name: "Loop Time"
+      id: loop_time
+      disabled_by_default: False
+    cpu_frequency:
+      name: "CPU Frequency"
+      id: cpu_frequency
+      disabled_by_default: True
+
+  - platform: template
+    name: "Heap Free (KB)"
+    id: heap_free_kb
+    icon: "mdi:memory"
+    unit_of_measurement: "KB"
+    entity_category: diagnostic
+    accuracy_decimals: 0
+    lambda: |-
+      if (isnan(id(heap_free).state)) return NAN;
+      return id(heap_free).state / 1024.0;
+
+  - platform: template
+    name: "Heap Max Block (KB)"
+    id: heap_max_block_kb
+    icon: "mdi:memory"
+    entity_category: diagnostic
+    unit_of_measurement: "KB"
+    accuracy_decimals: 0
+    lambda: |-
+      if (isnan(id(heap_block).state)) return NAN;
+      return id(heap_block).state / 1024.0;
+
+  - platform: uptime
+    name: "Uptime (Seconds)"
+    id: uptime_sensor
+    icon: "mdi:update"
+    entity_category: diagnostic
+    update_interval: 55s
+    disabled_by_default: True
+
+  - platform: template
+    name: "Uptime (Minutes)"
+    id: uptime_minutes
+    icon: "mdi:update"
+    entity_category: diagnostic
+    unit_of_measurement: "min"
+    accuracy_decimals: 0
+    lambda: |-
+      if (isnan(id(uptime_sensor).state)) return NAN;
+      return id(uptime_sensor).state / 60.0;
+
+  - platform: wifi_signal
+    name: "WiFi Strength"
+    entity_category: diagnostic
+    icon: "mdi:wifi"
+    update_interval: 60s
+
+  - platform: template
+    name: "CPU Frequency MHz"
+    icon: "mdi:cpu-32-bit"
+    entity_category: diagnostic
+    unit_of_measurement: "MHz"
+    lambda: |-
+      if (id(cpu_frequency).has_state()) {
+        float freq = id(cpu_frequency).state;
+        if (freq > 0) {
+          return {static_cast<float>(round(freq / 1000000 * 100) / 100)};
+        } else {
+          return {NAN};
+        }
+      } else {
+        return {NAN};
+      }
+    update_interval: 66s
+
+number:
+  # Paper feed after print_text and the test page (printer_bridge.h). A client may send its own feed
+  # instead, as airquality's "Print Feed Lines" does.
+  - platform: template
+    name: "Feed Lines"
+    icon: "mdi:arrow-expand-down"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 13
+    mode: box
+    min_value: 0
+    max_value: 20
+    step: 1
+    initial_value: 5
+    optimistic: true
+    restore_value: true
+    on_value:
+      - lambda: printer_bridge::set_feed_lines(x);
+  # Status LED (light below)
+  - platform: template
+    name: "LED Brightness"
+    id: led_brightness
+    icon: "mdi:brightness-6"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 21
+    mode: slider
+    unit_of_measurement: "%"
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 30
+    optimistic: true
+    restore_value: true
+  # Location for "LED Night Off" (sunrise/sunset), decimal degrees, north/east positive; 0 / 0 = not set.
+  # "Location Help" says where to look them up.
+  - platform: template
+    name: "Latitude"
+    id: sun_latitude
+    icon: "mdi:latitude"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 28
+    mode: box
+    min_value: -90
+    max_value: 90
+    step: 0.0001
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    on_value:
+      - lambda: id(sun_position).set_latitude(x);
+      - component.update: next_sunrise
+      - component.update: next_sunset
+  - platform: template
+    name: "Longitude"
+    id: sun_longitude
+    icon: "mdi:longitude"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 29
+    mode: box
+    min_value: -180
+    max_value: 180
+    step: 0.0001
+    initial_value: 0
+    optimistic: true
+    restore_value: true
+    on_value:
+      - lambda: id(sun_position).set_longitude(x);
+      - component.update: next_sunrise
+      - component.update: next_sunset
+
+# Status LED, driven by the interval below: blue blinking = print job, red blinking = no WiFi,
+# yellow = printer not ready (no answer, paper out, ...), green = ready. Internal, so the web UI can't fight the
+# status logic; "Status LED", "LED Brightness", "LED Night Off" and "LED Test" control it instead.
+light:
+  - platform: esp32_rmt_led_strip
+    id: status_led
+    pin: GPIO${status_led_pin}
+    chipset: WS2812
+    channel_colors: GRB
+    num_leds: 1
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 0s
+    # Linear, so "LED Brightness" is the duty cycle and the yellow mix stays yellow.
+    gamma_correct: 1.0
+
+switch:
+  - platform: restart
+    name: ${name} restart
+    entity_category: diagnostic
+  - platform: template
+    name: "Status LED"
+    id: status_led_enabled
+    icon: "mdi:led-on"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 20
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+  # Status LED off between sunset and sunrise (sun below the horizon, see "sun:"), except during a print.
+  - platform: template
+    name: "LED Night Off"
+    id: led_night_off
+    icon: "mdi:weather-night"
+    entity_category: config
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 23
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+button:
+  - platform: template
+    name: "Print Test Page"
+    icon: "mdi:printer-pos-cog"
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 4
+    on_press:
+      - lambda: printer_bridge::print_test_page();
+  # Firmware, manufacturer, model, serial number and status of the printer, written to the log (web UI log panel).
+  - platform: template
+    name: "Read Printer Info"
+    icon: "mdi:information-outline"
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 5
+    on_press:
+      - lambda: |-
+          ESP_LOGI("printer_info", "Reading printer info...");
+          printer_bridge::info_requested = true;
+  - platform: template
+    name: "LED Test"
+    icon: "mdi:palette"
+    web_server:
+      sorting_group_id: web_group_printer
+      sorting_weight: 22
+    on_press:
+      - script.execute: led_test
+  # Factory Reset
+  - platform: factory_reset
+    name: "Factory Reset"
+    entity_category: diagnostic
+  # Save Mode
+  - platform: safe_mode
+    name: "Safe Mode"
+    entity_category: diagnostic
+
+# Status LED colors, 1 s each: red, green, blue, yellow, white; then back to the status.
+script:
+  - id: led_test
+    mode: restart
+    then:
+      - lambda: ESP_LOGD("status_led", "LED test");
+      - light.turn_on:
+          id: status_led
+          red: 100%
+          green: 0%
+          blue: 0%
+          brightness: !lambda return id(led_brightness).state / 100.0f;
+          transition_length: 0s
+      - delay: 1s
+      - light.turn_on:
+          id: status_led
+          red: 0%
+          green: 100%
+          blue: 0%
+          brightness: !lambda return id(led_brightness).state / 100.0f;
+          transition_length: 0s
+      - delay: 1s
+      - light.turn_on:
+          id: status_led
+          red: 0%
+          green: 0%
+          blue: 100%
+          brightness: !lambda return id(led_brightness).state / 100.0f;
+          transition_length: 0s
+      - delay: 1s
+      - light.turn_on:
+          id: status_led
+          red: 100%
+          green: 63%  # same mix as the status "yellow" (255, 160, 0)
+          blue: 0%
+          brightness: !lambda return id(led_brightness).state / 100.0f;
+          transition_length: 0s
+      - delay: 1s
+      - light.turn_on:
+          id: status_led
+          red: 100%
+          green: 100%
+          blue: 100%
+          brightness: !lambda return id(led_brightness).state / 100.0f;
+          transition_length: 0s
+      - delay: 1s
+
+interval:
+  # Printer info from the bridge task (button "Read Printer Info"), logged here in the loop.
+  - interval: 500ms
+    then:
+      - lambda: |-
+          if (!printer_bridge::info_ready) return;
+          const std::string &text = printer_bridge::info_text;
+          for (size_t start = 0, end; start < text.size(); start = end + 1) {
+            end = text.find('\n', start);
+            if (end == std::string::npos) end = text.size();
+            ESP_LOGI("printer_info", "%s", text.substr(start, end - start).c_str());
+          }
+          printer_bridge::info_ready = false;
+  - interval: 1s
+    then:
+      - lambda: |-
+          static std::string last;
+          std::string status = printer_bridge::status_text();
+          if (status == last) return;
+          last = status;
+          id(printer_status).publish_state(status);
+  # Status LED: 250 ms ticks, blue blinks at 2 Hz, red at 1 Hz. Only writes the LED when the color changes.
+  - interval: 250ms
+    then:
+      - lambda: |-
+          static uint32_t tick = 0;
+          static uint32_t last_key = UINT32_MAX;
+          static const char *last_mode = "";
+          tick++;
+          if (id(led_test).is_running()) {
+            last_key = UINT32_MAX;  // re-apply the status after the test
+            return;
+          }
+          // Night: sun below the horizon (-0.833°, the elevation of the sunrise/sunset times). Without a location
+          // (0 / 0) or before SNTP has the time (elevation() is NaN, NaN < x is false) the LED shows the status.
+          bool located = id(sun_latitude).state != 0 || id(sun_longitude).state != 0;
+          bool night = located && id(sun_position).elevation() < -0.833;
+          const char *mode;
+          uint8_t r = 0, g = 0, b = 0;
+          if (!id(status_led_enabled).state) {
+            mode = "off";
+          } else if (printer_bridge::printing()) {
+            mode = "blue blinking (print job)";
+            if (tick & 1) b = 255;
+          } else if (id(led_night_off).state && night) {
+            mode = "off (night)";
+          } else if (!wifi::global_wifi_component->is_connected()) {
+            mode = "red blinking (no WiFi)";
+            if (tick & 2) r = 255;
+          } else if (!printer_bridge::ready()) {
+            mode = "yellow (printer not ready)";
+            r = 255;
+            g = 160;
+          } else {
+            mode = "green (ready)";
+            g = 255;
+          }
+          if (mode != last_mode) {
+            ESP_LOGD("status_led", "%s", mode);
+            last_mode = mode;
+          }
+          float brightness = isnan(id(led_brightness).state) ? 0.3f : id(led_brightness).state / 100.0f;
+          uint32_t key = (uint32_t(r) << 24) | (uint32_t(g) << 16) | (uint32_t(b) << 8) | uint8_t(brightness * 100);
+          if (key == last_key) return;
+          last_key = key;
+          // No publish/save: the light is internal, and blinking must not log or write to flash.
+          auto call = id(status_led).make_call();
+          call.set_publish(false);
+          call.set_save(false);
+          call.set_transition_length(0);
+          if (r == 0 && g == 0 && b == 0) {
+            call.set_state(false);
+          } else {
+            call.set_state(true);
+            call.set_rgb(r / 255.0f, g / 255.0f, b / 255.0f);
+            call.set_brightness(brightness);
+          }
+          call.perform();
+
+# Board: Tenstar Robot ESP32-C3 Super Mini. Chip ESP32-C3FH4 (QFN32 rev v0.4, 4 MB embedded flash, native
+# USB serial/JTAG, MAC e4:b3:23:c3:e7:9c; read with esptool on 2026-09-28).
+# | --------------------------------------------------------- |
+# | GPIO Pin | Notes.                                         |
+# | :------- | :--------------------------------------------- |
+# | GPIO00   | Free.                                          |
+# | GPIO01   | Free.                                          |
+# | GPIO02   | Free (strapping pin).                          |
+# | GPIO03   | Free.                                          |
+# | GPIO04   | Free (JTAG MTMS).                              |
+# | GPIO05   | Free (JTAG MTDI).                              |
+# | GPIO06   | UART1 RX <- printer TX (connector pin 2)       |
+# | GPIO07   | UART1 TX -> printer RX (connector pin 3)       |
+# | GPIO08   | On-board LED (strapping pin), unused           |
+# | GPIO09   | BOOT button (strapping pin), unused            |
+# | GPIO10   | WS2812B status LED (DIN)                       |
+# | GPIO11   | N.A. (embedded flash supply)                   |
+# | GPIO12   | N.A. (embedded flash)                          |
+# | GPIO13   | N.A. (embedded flash)                          |
+# | GPIO14   | N.A. (embedded flash)                          |
+# | GPIO15   | N.A. (embedded flash)                          |
+# | GPIO16   | N.A. (embedded flash)                          |
+# | GPIO17   | N.A. (embedded flash)                          |
+# | GPIO18   | USB D- (flashing, logger)                      |
+# | GPIO19   | USB D+ (flashing, logger)                      |
+# | GPIO20   | Free (UART0 RX), not used for the printer      |
+# | GPIO21   | Keep free: ROM boot messages (UART0 TX)        |
+# | --------------------------------------------------------- |
+
+# Power: 12 V / 3 A PSU -> MP1584EN at 8.7-9.0 V for the printer, Mini-360 at 5.0 V for the C3
+# (wiki: Assembly Guide, step 2).
+# Printer connectors (QR204, label "DC: 5-9V 2A+"):
+# Power:  pin 2 VH (8.7-9.0 V) <- MP1584EN OUT+, pin 3 GND <- MP1584EN OUT-; C3 5V/GND <- Mini-360 OUT+/OUT-
+# Serial: pin 2 TX -> GPIO06 (divider or MAX3232 depending on the level, see the wiki's Assembly Guide),
+#         pin 3 RX <- GPIO07, pin 5 GND -> C3 GND, pins 1 (NC) and 4 (DTR) unused
+# Status LED: WS2812B VDD <- C3 3V3, GND <- C3 GND, DIN <- GPIO10 (wiki: Assembly Guide, step 2)

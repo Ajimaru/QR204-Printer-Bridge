@@ -1,0 +1,108 @@
+name: validate
+
+# Status check for pull requests: proves thermal-printer.yaml still compiles
+# before anything reaches main.
+on:
+  pull_request:
+    paths:
+      - 'esphome/**'
+      - '.github/workflows/validate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'esphome/**'
+      - '.github/workflows/validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  esphome:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ESPHome
+        run: pip install esphome
+
+      # The real secrets.yaml lives on the Home Assistant host and is never
+      # committed. 'esphome config' resolves every !secret, so CI needs stand-ins:
+      # these are throwaway values, not credentials. The API key is generated per
+      # run because ESPHome rejects an all-zeros key ("reserved and provides no
+      # protection"), which would fail the check on a placeholder.
+      - name: Write placeholder secrets
+        working-directory: esphome
+        run: |
+          cat > secrets.yaml <<EOF
+          wifi_ssid: ci-placeholder
+          wifi_password: ci-placeholder-password
+          api_encryption_key: "$(openssl rand -base64 32)"
+          web_server_username: ci
+          web_server_password: ci-placeholder-password
+          EOF
+
+      # Resolves substitutions, !secret and the C++ include, and validates every
+      # component's schema -- the cheap check that catches a broken config.
+      - name: Validate config
+        working-directory: esphome
+        run: esphome config thermal-printer.yaml
+
+  # Catches broken tables, split links and dead wiki anchors in docs/ before they
+  # are published to the wiki by wiki-sync.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check docs links, anchors and tables
+        run: |
+          python3 - <<'EOF'
+          import re, pathlib, sys, urllib.parse
+
+          def slug(h):
+              s = re.sub(r'[^\w\s-]', '', h.strip().lower())
+              return re.sub(r'\s+', '-', s)
+
+          docs = sorted(pathlib.Path('docs').glob('*.md'))
+          pages = {f.stem: {slug(m.group(1))
+                            for m in re.finditer(r'^#{1,6} (.+)$', f.read_text(encoding='utf-8'), re.M)}
+                   for f in docs}
+          targets = docs + [pathlib.Path('README.md'), pathlib.Path('SECURITY.md')]
+          bad = []
+
+          for f in targets:
+              t = f.read_text(encoding='utf-8')
+              if re.search(r'\[[^\]\n]*\]\s*\n\s*\(', t) or re.search(r'\]\(\s*\n', t):
+                  bad.append(f'{f}: markdown link split across lines')
+              for m in re.finditer(r'(?:\]\(|href=")https://github\.com/Ajimaru/QR204-Printer-Bridge/wiki/([A-Za-z-]+)(?:#([\w-]+))?', t):
+                  page, anchor = m.group(1), m.group(2)
+                  if page not in pages and page != 'Home':
+                      bad.append(f'{f}: link to unknown wiki page {page}')
+                  elif anchor and page in pages and anchor not in pages[page]:
+                      bad.append(f'{f}: dead anchor {page}#{anchor}')
+              for m in re.finditer(r'\]\((?!https?:|#)([^)]+)\)', t):
+                  tgt = urllib.parse.unquote(m.group(1)).split('#')[0]
+                  if not pathlib.Path(tgt).exists():
+                      bad.append(f'{f}: link to missing path {tgt}')
+              for m in re.finditer(r'(?:\]\(|href=")https://github\.com/Ajimaru/QR204-Printer-Bridge/(?:blob|tree)/main/([^)"#]+)', t):
+                  tgt = urllib.parse.unquote(m.group(1))
+                  if not pathlib.Path(tgt).exists():
+                      bad.append(f'{f}: link to missing repo path {tgt}')
+              for i, line in enumerate(t.split('\n'), 1):
+                  if line.startswith('|') and not line.rstrip().endswith('|'):
+                      bad.append(f'{f}:{i}: table row does not end with |')
+
+          # docs/ must not contain a Home page: wiki-sync would overwrite the
+          # wiki's own landing page with it.
+          if pathlib.Path('docs/Home.md').exists():
+              bad.append('docs/Home.md exists -- it would overwrite the wiki landing page')
+
+          for b in dict.fromkeys(bad):
+              print(f'::error::{b}')
+          sys.exit(1 if bad else 0)
+          EOF
