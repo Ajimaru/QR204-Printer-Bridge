@@ -19,7 +19,7 @@ built, and how the documentation is published.
 | [`datasheets/`](https://github.com/Ajimaru/QR204-Printer-Bridge/tree/main/datasheets) | QR204 manual (Chinese): pinout, ESC/POS command set |
 | [`Thermal Printer Housing/`](https://github.com/Ajimaru/QR204-Printer-Bridge/tree/main/Thermal%20Printer%20Housing) | Housing and lid STLs |
 | [`docs/`](https://github.com/Ajimaru/QR204-Printer-Bridge/tree/main/docs) | Wiki source, see "Documentation and wiki sync" |
-| [`.github/workflows/`](https://github.com/Ajimaru/QR204-Printer-Bridge/tree/main/.github/workflows) | `validate` (pull-request status checks) and `wiki-sync` (publishes `docs/`) |
+| [`.github/workflows/`](https://github.com/Ajimaru/QR204-Printer-Bridge/tree/main/.github/workflows) | `validate` (pull-request status checks), `release` (config bundle and draft release) and `wiki-sync` (publishes `docs/`) |
 
 ## Bridge internals
 
@@ -111,6 +111,49 @@ Two workflows gate a pull request:
 `esphome config` is a schema check, not a compile: it catches a malformed YAML or an unknown option, but not a
 C++ error in `printer_bridge.h`. A full `esphome compile` pulls the ESP-IDF toolchain and takes several
 minutes, so it is left to the flash itself.
+
+## Releases
+
+A release is a **config bundle**, not a firmware image. The WiFi credentials and the API key are compiled into
+the firmware, so a prebuilt `.bin` would either not connect or carry someone else's secrets. The bundle
+`QR204-Printer-Bridge-<version>.zip` holds `thermal-printer.yaml`, `printer_bridge.h`, `secrets.yaml.example`,
+`INSTALL.md`, the housing STLs, `LICENSE` and `SECURITY.md`, with a `.sha256` next to it.
+
+To cut a release, tag a commit that is on `main` and push the tag:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The `release` workflow then:
+
+1. refuses a tag that is not on `main` (the branch is protected, tags are not);
+2. builds the bundle and proves it installs: it copies `secrets.yaml.example`, swaps in a generated API key and
+   runs `esphome config` from the bundle folder, so an example that misses a secret the config needs fails here;
+3. creates a **draft** release with generated notes and attaches the zip and checksum.
+
+The release is always a draft. Pushing a tag never publishes on its own: open the draft, read the notes, check
+the attached files and publish by hand. A tag with an `a`, `b`, `rc`, `dev`, `alpha` or `beta` segment
+(`v0.2.0-rc1`) is marked as a prerelease. Tags are `v*` or a bare version number.
+
+Pull requests and manual runs build and check the same bundle but create no release; the zip is kept as a
+workflow artifact for inspection. This check is not a required status check.
+
+The notes group merged pull requests by label, according to [`.github/release.yml`](https://github.com/Ajimaru/QR204-Printer-Bridge/blob/main/.github/release.yml).
+A pull request lands in the first category whose label it carries, and an unlabelled one still appears under
+"Other Changes". Label a pull request `skip-changelog` to leave it out.
+
+| Label | Section |
+| --- | --- |
+| `breaking`, `breaking-change` | Breaking Changes |
+| `security` | Security |
+| `enhancement`, `feature` | New Features |
+| `bug`, `fix` | Bug Fixes |
+| `hardware`, `housing` | Hardware & Housing |
+| `documentation`, `docs` | Documentation |
+| `dependencies` | Dependencies |
+| `ci`, `tooling`, `chore`, `github_actions` | CI / Tooling |
 
 ## Documentation and wiki sync
 

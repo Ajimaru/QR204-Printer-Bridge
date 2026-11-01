@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-release-notes.json
+# Configuration for GitHub auto-generated release notes
+# https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
+#
+# A pull request is filed by its labels, and lands in the FIRST category below
+# whose labels it carries, so the order is a priority rule, not cosmetic. A PR
+# labelled both `bug` and `enhancement` shows up under New Features only, never
+# twice. What users care about comes first, CI noise last.
+#
+# The catch-all `*` at the end means an unlabelled PR is still listed instead of
+# being dropped silently.
+changelog:
+  categories:
+    - title: "⚠️ Breaking Changes"
+      labels:
+        - "breaking"
+        - "breaking-change"
+    - title: "🔒 Security"
+      labels:
+        - "security"
+    - title: "✨ New Features"
+      labels:
+        - "enhancement"
+        - "feature"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "bug"
+        - "fix"
+    - title: "🔌 Hardware & Housing"
+      labels:
+        - "hardware"
+        - "housing"
+    - title: "📚 Documentation"
+      labels:
+        - "documentation"
+        - "docs"
+    - title: "📦 Dependencies"
+      labels:
+        - "dependencies"
+    - title: "🔧 CI / Tooling"
+      labels:
+        - "ci"
+        - "tooling"
+        - "chore"
+        - "github_actions"
+    - title: "🧩 Other Changes"
+      labels:
+        - "*"
+  exclude:
+    labels:
+      - "skip-changelog"
