@@ -22,6 +22,12 @@ esphome:
   friendly_name: ${friendly_name}
   min_version: 2025.5.0
   name_add_mac_suffix: false
+  # Release version, shown by Home Assistant in the device info and announced over mDNS. A release tag
+  # must match it (v0.1.0 -> "0.1.0"): the release workflow refuses a tag that does not. Change it in the
+  # pull request that prepares the release, not afterwards.
+  project:
+    name: "ajimaru.qr204-printer-bridge"
+    version: "0.1.0"
   includes:
     - printer_bridge.h
   on_boot:

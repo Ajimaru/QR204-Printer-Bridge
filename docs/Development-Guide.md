@@ -119,26 +119,35 @@ the firmware, so a prebuilt `.bin` would either not connect or carry someone els
 `QR204-Printer-Bridge-<version>.zip` holds `thermal-printer.yaml`, `printer_bridge.h`, `secrets.yaml.example`,
 `INSTALL.md`, the housing STLs, `LICENSE` and `SECURITY.md`, with a `.sha256` next to it.
 
-To cut a release, tag a commit that is on `main` and push the tag:
+The version lives in one place, `esphome.project.version` in `thermal-printer.yaml`. The firmware reports it
+to Home Assistant (device info) and announces it over mDNS as `project_version`; the web UI does not show it.
+To cut a release:
 
-```sh
-git tag v0.1.0
-git push origin v0.1.0
-```
+1. Set `esphome.project.version` to the new version, for example `"0.2.0"`, in a pull request, and merge it.
+2. Tag the merged commit on `main` with that version and a leading `v`, and push the tag:
+
+   ```sh
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
 
 The `release` workflow then:
 
 1. refuses a tag that is not on `main` (the branch is protected, tags are not);
-2. builds the bundle and proves it installs: it copies `secrets.yaml.example`, swaps in a generated API key and
+2. refuses a tag that does not equal `esphome.project.version` (`v0.2.0` or `0.2.0` against `"0.2.0"`), so the
+   firmware cannot report a different version than the release it came from. A prerelease tag such as
+   `v0.2.0-rc1` needs the version `"0.2.0-rc1"` in the file;
+3. builds the bundle and proves it installs: it copies `secrets.yaml.example`, swaps in a generated API key and
    runs `esphome config` from the bundle folder, so an example that misses a secret the config needs fails here;
-3. creates a **draft** release with generated notes and attaches the zip and checksum.
+4. creates a **draft** release with generated notes and attaches the zip and checksum.
 
 The release is always a draft. Pushing a tag never publishes on its own: open the draft, read the notes, check
 the attached files and publish by hand. A tag with an `a`, `b`, `rc`, `dev`, `alpha` or `beta` segment
 (`v0.2.0-rc1`) is marked as a prerelease. Tags are `v*` or a bare version number.
 
 Pull requests and manual runs build and check the same bundle but create no release; the zip is kept as a
-workflow artifact for inspection. This check is not a required status check.
+workflow artifact for inspection. They also check that the version can be read from `thermal-printer.yaml`, but
+do not compare it with a tag. This check is not a required status check.
 
 The notes group merged pull requests by label, according to [`.github/release.yml`](https://github.com/Ajimaru/QR204-Printer-Bridge/blob/main/.github/release.yml).
 A pull request lands in the first category whose label it carries, and an unlabelled one still appears under
