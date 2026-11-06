@@ -1,12 +1,12 @@
 name: validate
 
-# Status check for pull requests: proves thermal-printer.yaml still compiles
-# before anything reaches main.
+# Status checks for pull requests: proves thermal-printer.yaml still compiles and
+# the docs links/anchors resolve before anything reaches main. Both jobs are
+# required status checks, so this workflow must run on every pull request -- with
+# a path filter, a docs-only pull request would never get its required checks and
+# could never be merged.
 on:
   pull_request:
-    paths:
-      - 'esphome/**'
-      - '.github/workflows/validate.yml'
   push:
     branches: [main]
     paths:
