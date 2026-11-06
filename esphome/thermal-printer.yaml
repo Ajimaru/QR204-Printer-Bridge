@@ -7,6 +7,9 @@
 substitutions:
   name: thermal-printer
   friendly_name: thermal-printer
+  # Single source for the release version; esphome.project.version below uses it. A release tag must
+  # match it (v0.2.0 -> "0.2.0"), the release workflow refuses a tag that does not.
+  version: "0.2.0"
   # QR204 serial port: baud rate from the self-test page (hold FEED while powering on).
   printer_baud: "9600"
   # C3 TX -> printer RX (connector pin 3), printer TX (connector pin 2) -> C3 RX.
@@ -22,12 +25,11 @@ esphome:
   friendly_name: ${friendly_name}
   min_version: 2025.5.0
   name_add_mac_suffix: false
-  # Release version, shown by Home Assistant in the device info and announced over mDNS. A release tag
-  # must match it (v0.1.0 -> "0.1.0"): the release workflow refuses a tag that does not. Change it in the
-  # pull request that prepares the release, not afterwards.
+  # Release version, shown by Home Assistant in the device info and announced over mDNS, taken from the
+  # "version" substitution above. Change it in the pull request that prepares the release, not afterwards.
   project:
     name: "ajimaru.qr204-printer-bridge"
-    version: "0.1.0"
+    version: "${version}"
   includes:
     - printer_bridge.h
   on_boot:
@@ -40,10 +42,13 @@ esp32:
   board: esp32-c3-devkitm-1
   framework:
     type: esp-idf
+    advanced:
+      # Generic flash driver instead of the vendor drivers: saves IRAM (ESPHome build log suggests it).
+      flash_chip: generic
 
 # USB serial/JTAG (the C3 default), so the UART pins stay free.
 logger:
-  level: DEBUG
+  level: INFO
 
 api:
   # Keep running without an API client; print jobs arrive over TCP, not through Home Assistant.
@@ -89,7 +94,7 @@ web_server:
 
 # Debug
 debug:
-  update_interval: 5s
+  update_interval: 30s
 
 # Time for the sun position ("LED Night Off"), from SNTP. Works without Home Assistant.
 time:
@@ -149,7 +154,7 @@ text_sensor:
     web_server:
       sorting_group_id: web_group_printer
       sorting_weight: 26
-    update_interval: 60s
+    update_interval: 1h
     lambda: |-
       if (id(sun_latitude).state == 0 && id(sun_longitude).state == 0) return {"Location not set"};
       auto t = id(sun_position).sunrise(-0.833);
@@ -164,7 +169,7 @@ text_sensor:
     web_server:
       sorting_group_id: web_group_printer
       sorting_weight: 27
-    update_interval: 60s
+    update_interval: 1h
     lambda: |-
       if (id(sun_latitude).state == 0 && id(sun_longitude).state == 0) return {"Location not set"};
       auto t = id(sun_position).sunset(-0.833);
@@ -179,7 +184,7 @@ text_sensor:
     web_server:
       sorting_group_id: web_group_printer
       sorting_weight: 30
-    update_interval: 1h
+    update_interval: never
     lambda: |-
       return {"https://www.openstreetmap.org: search your address, right-click on the spot, "
               "\"Show address\", copy the two numbers (latitude, longitude)"};
@@ -225,10 +230,6 @@ sensor:
       name: "Heap Max Block (Bytes)"
       id: heap_block
       disabled_by_default: True
-    loop_time:
-      name: "Loop Time"
-      id: loop_time
-      disabled_by_default: False
     cpu_frequency:
       name: "CPU Frequency"
       id: cpu_frequency
@@ -581,7 +582,7 @@ interval:
           call.perform();
 
 # Board: Tenstar Robot ESP32-C3 Super Mini. Chip ESP32-C3FH4 (QFN32 rev v0.4, 4 MB embedded flash, native
-# USB serial/JTAG, MAC e4:b3:23:c3:e7:9c; read with esptool on 2026-09-28).
+# USB serial/JTAG; chip details read with esptool).
 # | --------------------------------------------------------- |
 # | GPIO Pin | Notes.                                         |
 # | :------- | :--------------------------------------------- |

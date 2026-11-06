@@ -71,4 +71,10 @@ The housing holds the printer, both buck converters and the ESP32-C3. STL files 
 
 PETG is the better choice if the housing sits anywhere warm: the print head gets hot during long dark prints.
 
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Ajimaru/QR204-Printer-Bridge/main/assets/thermalprinter.jpg" alt="QR204 thermal printer in its 3D-printed housing, printing an air-quality report" width="480">
+</p>
+<!-- markdownlint-enable MD033 -->
+
 With everything on the bench, continue with the [Assembly Guide](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Assembly-Guide).

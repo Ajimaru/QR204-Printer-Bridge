@@ -7,8 +7,9 @@ whether that fits your network.
 
 ## Supported versions
 
-Only the current state of this repository is maintained. There are no releases and no backports; fixes land on
-the main branch, and you update by re-flashing the device (over the air from ESPHome Device Builder).
+Only the current state of this repository is maintained; there are no backports. Releases are config bundles
+(`QR204-Printer-Bridge-<version>.zip`), not separately supported firmware branches: fixes land on the main
+branch, and you update by re-flashing the device (over the air from ESPHome Device Builder).
 
 ## Reporting a vulnerability
 
