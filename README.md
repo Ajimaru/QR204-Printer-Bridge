@@ -6,18 +6,33 @@
   shell one-liner, or a sensor box sending its current screen. Printer status comes back as Home
   Assistant entities.
 </p>
+
+<p align="center">
+  <img src="assets/thermalprinter.jpg" alt="QR204 thermal printer in its 3D-printed housing, printing an air-quality report from the sensor box" width="480">
+</p>
 <!-- markdownlint-enable MD033 -->
 
-[![License][badge-license]](LICENSE)
-[![Platform][badge-platform]](https://www.espressif.com/en/products/socs/esp32-c3)
+[![Release][badge-release]](https://github.com/Ajimaru/QR204-Printer-Bridge/releases/latest)
+[![Downloads][badge-downloads]](https://github.com/Ajimaru/QR204-Printer-Bridge/releases)
+[![Last commit][badge-last-commit]](https://github.com/Ajimaru/QR204-Printer-Bridge/commits/main)
+[![Validate][badge-validate]](https://github.com/Ajimaru/QR204-Printer-Bridge/actions/workflows/validate.yml)
+[![License: MIT][badge-license]](LICENSE)
+
 [![ESPHome][badge-esphome]](https://esphome.io)
+[![Platform][badge-platform]](https://www.espressif.com/en/products/socs/esp32-c3)
 [![Printer][badge-printer]](datasheets/)
+[![Home Assistant][badge-homeassistant]](https://www.home-assistant.io/)
 [![Made with Love][badge-love]](https://github.com/Ajimaru/QR204-Printer-Bridge)
 
-[badge-license]: https://img.shields.io/github/license/Ajimaru/QR204-Printer-Bridge?style=flat-square
-[badge-platform]: https://img.shields.io/badge/ESP32--C3-FH4-blue.svg?style=flat-square
-[badge-esphome]: https://img.shields.io/badge/ESPHome-esp--idf-orange.svg?style=flat-square
-[badge-printer]: https://img.shields.io/badge/QR204-58_mm_ESC%2FPOS-lightgrey.svg?style=flat-square
+[badge-release]: https://img.shields.io/github/v/release/Ajimaru/QR204-Printer-Bridge?sort=semver&style=flat-square&logo=github&logoColor=white
+[badge-downloads]: https://img.shields.io/github/downloads/Ajimaru/QR204-Printer-Bridge/total?style=flat-square&logo=github&logoColor=white&label=downloads
+[badge-last-commit]: https://img.shields.io/github/last-commit/Ajimaru/QR204-Printer-Bridge?style=flat-square&logo=github&logoColor=white
+[badge-validate]: https://img.shields.io/github/actions/workflow/status/Ajimaru/QR204-Printer-Bridge/validate.yml?style=flat-square&logo=githubactions&logoColor=white&label=validate
+[badge-license]: https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square&logo=open-source-initiative&logoColor=white
+[badge-esphome]: https://img.shields.io/badge/ESPHome-2026.10-black?style=flat-square&logo=esphome&logoColor=white
+[badge-platform]: https://img.shields.io/badge/platform-ESP32--C3-red?style=flat-square&logo=espressif&logoColor=white
+[badge-printer]: https://img.shields.io/badge/QR204-58_mm_ESC%2FPOS-lightgrey?style=flat-square
+[badge-homeassistant]: https://img.shields.io/badge/Home%20Assistant-ESPHome%20API-41bdf5?style=flat-square&logo=homeassistant&logoColor=white
 [badge-love]: https://img.shields.io/badge/made_with-%E2%9D%A4%EF%B8%8F-ff69b4?style=flat-square
 
 > [!WARNING]
@@ -83,6 +98,7 @@ The wiki pages are generated from [`docs/`](docs/) in this repository; see [Docu
 | [`esphome/printer_bridge.h`](esphome/printer_bridge.h) | TCP port 9100 ↔ UART bridge, status polling, test page |
 | [`esphome/secrets.yaml.example`](esphome/secrets.yaml.example) | Template for the `secrets.yaml` the config needs |
 | [`datasheets/`](datasheets/) | QR204 manual (Chinese): pinout, ESC/POS command set |
+| [`assets/`](assets/) | Photo of the finished bridge, used in the README and the hardware guide |
 | [`Thermal Printer Housing/`](Thermal%20Printer%20Housing/) | Housing and lid STLs |
 | [`docs/`](docs/) | Wiki source, published by the `wiki-sync` workflow |
 | [`wiki/`](wiki/) | Wiki landing page and navigation templates, added once by hand |

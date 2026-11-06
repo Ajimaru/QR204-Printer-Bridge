@@ -63,7 +63,7 @@ This bridge exists because of how one particular client had to reach the printer
 | Location Help | Where to look up the coordinates (OpenStreetMap) |
 | LED Test | Button: color test (see "Status LED") |
 | Feed Lines | Config: paper feed after `print_text` and the test page, 0–20, default 5 (a sending client may set its own feed instead, as `airquality`'s "Print Feed Lines" does) |
-| Action `print_text` | Prints UTF-8 text; ä, ö, ü, ß print as ae, oe, ue, ss, `°` and `µ` as is, other non-ASCII characters as `?` (see [measured firmware behaviour](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Development-Guide#the-unit-used-here-self-test-page-2026-09-28)) |
+| Action `print_text` | Prints UTF-8 text; ä, ö, ü, ß print as ae, oe, ue, ss, `°` and `µ` as is, other non-ASCII characters as `?` (see [measured firmware behaviour](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Development-Guide#the-unit-used-here-self-test-page)) |
 
 The status is only polled while no job is being sent, and only when the printer's TX line is connected.
 `print_text` and "Print Test Page" are skipped (log warning) while a TCP job is running.

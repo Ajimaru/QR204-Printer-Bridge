@@ -49,16 +49,33 @@ jobs:
 
       # The firmware reports esphome.project.version to Home Assistant. A release whose
       # tag disagrees with it would ship a bundle that misreports its own version, so a
-      # tag must equal that string (v0.1.0 -> 0.1.0). Runs on pull requests too, without
+      # tag must equal that string (v0.2.0 -> 0.2.0). The value may be a substitution
+      # reference (${version}), so the config keeps a single copy of the number; it is
+      # resolved from the substitutions block here. Runs on pull requests too, without
       # the comparison, so a change that breaks the lookup fails before anyone tags.
       - name: Firmware version
         env:
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
         run: |
-          fw="$(awk '/^esphome:/{e=1;next} /^[^ #]/{e=0} e&&/^  project:/{p=1;next} e&&p&&/^  [^ ]/{p=0} e&&p&&/^    version:/{v=$2; gsub(/"/,"",v); print v; exit}' esphome/thermal-printer.yaml)"
+          yaml=esphome/thermal-printer.yaml
+          fw="$(awk '/^esphome:/{e=1;next} /^[^ #]/{e=0} e&&/^  project:/{p=1;next} e&&p&&/^  [^ ]/{p=0} e&&p&&/^    version:/{v=$2; gsub(/"/,"",v); print v; exit}' "$yaml")"
+          case "$fw" in
+            '${'*'}')
+              key="${fw#\$\{}"
+              key="${key%\}}"
+              fw="$(awk -v key="$key" '
+                /^substitutions:/{s=1;next}
+                s&&/^[^ #]/{exit}
+                s&&index($0, "  " key ":")==1{v=$2; gsub(/"/,"",v); print v; exit}' "$yaml")"
+              if [ -z "$fw" ]; then
+                echo "::error::esphome.project.version references \${$key}, but substitutions has no ${key}"
+                exit 1
+              fi
+              ;;
+          esac
           if [ -z "$fw" ]; then
-            echo "::error::no esphome.project.version found in esphome/thermal-printer.yaml"
+            echo "::error::no esphome.project.version found in $yaml"
             exit 1
           fi
           echo "firmware version: $fw"
@@ -105,7 +122,8 @@ jobs:
       - name: Check the bundle installs
         run: |
           python -m pip install --upgrade pip
-          python -m pip install esphome
+          # Pinned to the tested release: an unpinned install could break this check on its own.
+          python -m pip install "esphome~=2026.10.0"
           cd "dist/$NAME"
           sed "s|^api_encryption_key: .*|api_encryption_key: \"$(openssl rand -base64 32)\"|" secrets.yaml.example > secrets.yaml
           esphome config thermal-printer.yaml > /dev/null

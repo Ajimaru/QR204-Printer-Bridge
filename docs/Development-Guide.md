@@ -40,7 +40,7 @@ printer — at 9600 baud a 23 KB screen print takes about 24 s on the wire.
 - `lwip_listen()` has a backlog of 1: one job at a time, further connections wait.
 - Status polling pauses while a client is connected, and resumes once the printer has worked through the job.
 
-### The unit used here (self-test page, 2026-09-28)
+### The unit used here (self-test page)
 
 | Field | Value |
 | --- | --- |
@@ -48,16 +48,16 @@ printer — at 9600 baud a 23 KB screen print takes about 24 s on the wire.
 | Interface | USB & TTL (not RS232); measured 3.3 V idle on TX and RX |
 | Baud rate | 9600 (matches `printer_baud`) |
 | Language | PC936 (GB18030), i.e. Chinese mode by default |
-| Status query (measured 2026-09-30) | `ESC v 0` doesn't match the manual: it answers `00 00` when ready and `08` without paper (the manual's "above 9.5 V" bit), and never sets "mechanism connected". The standard real-time status `DLE EOT n` works: `DLE EOT 2` answers `0x12` when ready, `0x32` without paper. Opening the lid reads as paper out |
-| Self-test command `DC2 T` (tested 2026-09-30) | Ignored; the self-test page only prints with FEED held at power-on |
-| Raster images (`GS v 0`, tested 2026-09-30) | The printer holds back a block until it is complete only up to ~1 KB. A larger block starts printing early and then waits for data at 9600 baud; every stop leaves a thin white line in dark areas (1128-byte blocks: line, 564-byte blocks: clean). `airquality` sends blocks of at most 576 bytes |
-| Header before an image (tested 2026-09-30) | While the printer prints text lines, image data piles up; it prints that backlog at full speed and stops abruptly when it runs out, leaving a white line ~5 mm into the image. 2500 NUL bytes after the text avoid it (1000 were not enough); `airquality` sends 3000 |
-| Printer ID `GS I n` (not in the manual, tested 2026-09-30) | n = 65–68: firmware `QR701_T1US-N32-2009` (the self-test page read 2008), manufacturer `GEZHI`, model `PT2D-V1.0`, serial number `17030800001`; the text answers have no terminator and start with a stray `-` or `_`. n = 1, 2, 3: model ID 0x60, type ID 0x03, ROM version 0x09. n = 69 (fonts): no answer |
+| Status query (measured) | `ESC v 0` doesn't match the manual: it answers `00 00` when ready and `08` without paper (the manual's "above 9.5 V" bit), and never sets "mechanism connected". The standard real-time status `DLE EOT n` works: `DLE EOT 2` answers `0x12` when ready, `0x32` without paper. Opening the lid reads as paper out |
+| Self-test command `DC2 T` (tested) | Ignored; the self-test page only prints with FEED held at power-on |
+| Raster images (`GS v 0`, tested) | The printer holds back a block until it is complete only up to ~1 KB. A larger block starts printing early and then waits for data at 9600 baud; every stop leaves a thin white line in dark areas (1128-byte blocks: line, 564-byte blocks: clean). `airquality` sends blocks of at most 576 bytes |
+| Header before an image (tested) | While the printer prints text lines, image data piles up; it prints that backlog at full speed and stops abruptly when it runs out, leaving a white line ~5 mm into the image. 2500 NUL bytes after the text avoid it (1000 were not enough); `airquality` sends 3000 |
+| Printer ID `GS I n` (not in the manual, tested) | n = 65–68: firmware `QR701_T1US-N32-2009` (the self-test page read 2008), manufacturer `GEZHI`, model `PT2D-V1.0`, serial number `<serial>`; the text answers have no terminator and start with a stray `-` or `_`. n = 1, 2, 3: model ID 0x60, type ID 0x03, ROM version 0x09. n = 69 (fonts): no answer |
 | Unsolicited output | When the paper runs out the printer sends text on its TX line: `err loop!`, `no paper!` |
-| Heating command `ESC 7 n1 n2 n3` (tested 2026-09-30) | Takes only one parameter; the next two bytes print as text (a stray "P" for the default heating time 80 = `P`). `ESC 7 n` with n = 0, 9, 40, 255 printed equally dark. Not used |
-| Density `DC2 # n` (not in the manual, tested 2026-09-30) | Accepted as a command, but n = 0, 15, 31 printed equally dark (n = 31 also swallowed the next byte). Not used |
-| Line spacing `ESC 3 n` (tested 2026-09-30) | Works, but n = 16 and n = 60 both gave more space than the default (`ESC 2`), which is already the most compact. Not used |
-| Character set (tested 2026-09-30) | Always GB18030: `FS .`, `ESC t n`, `ESC R n` and `ESC 9 n` (UTF-8) are ignored. The font has `°` (tested) and the GB2312 Greek letters (`μ` for µ) but no ä, ö, ü, ß |
+| Heating command `ESC 7 n1 n2 n3` (tested) | Takes only one parameter; the next two bytes print as text (a stray "P" for the default heating time 80 = `P`). `ESC 7 n` with n = 0, 9, 40, 255 printed equally dark. Not used |
+| Density `DC2 # n` (not in the manual, tested) | Accepted as a command, but n = 0, 15, 31 printed equally dark (n = 31 also swallowed the next byte). Not used |
+| Line spacing `ESC 3 n` (tested) | Works, but n = 16 and n = 60 both gave more space than the default (`ESC 2`), which is already the most compact. Not used |
+| Character set (tested) | Always GB18030: `FS .`, `ESC t n`, `ESC R n` and `ESC 9 n` (UTF-8) are ignored. The font has `°` (tested) and the GB2312 Greek letters (`μ` for µ) but no ä, ö, ü, ß |
 | Feed | `ESC d n` works, except right after a raster image (`GS v 0`), where it is ignored; a line feed first makes it work. About 6 lines clear the tear bar |
 | Code type | codepage |
 | Print mode / speed | S / 1 |
@@ -70,7 +70,7 @@ sending it: ä, ö, ü, ß become ae, oe, ue, ss; `°` and `µ` are sent as thei
 ² and ³ become 2 and 3; anything else outside ASCII becomes `?`. The screen image itself is a bitmap and keeps
 its umlauts.
 
-The TX level is not on the self-test page. Measured on this unit (2026-09-29, printer on 9 V, idle): TX and RX
+The TX level is not on the self-test page. Measured on this unit with the printer on 9 V and idle: TX and RX
 both at 3.3 V, i.e. 3.3 V TTL. It connects directly to the C3, no divider, no MAX3232.
 
 ## What gets sent (for reference)
@@ -119,11 +119,11 @@ the firmware, so a prebuilt `.bin` would either not connect or carry someone els
 `QR204-Printer-Bridge-<version>.zip` holds `thermal-printer.yaml`, `printer_bridge.h`, `secrets.yaml.example`,
 `INSTALL.md`, the housing STLs, `LICENSE` and `SECURITY.md`, with a `.sha256` next to it.
 
-The version lives in one place, `esphome.project.version` in `thermal-printer.yaml`. The firmware reports it
-to Home Assistant (device info) and announces it over mDNS as `project_version`; the web UI does not show it.
-To cut a release:
+The version lives in one place, the `version` substitution in `thermal-printer.yaml`; `esphome.project.version`
+references it as `${version}`. The firmware reports it to Home Assistant (device info) and announces it over
+mDNS as `project_version`; the web UI does not show it. To cut a release:
 
-1. Set `esphome.project.version` to the new version, for example `"0.2.0"`, in a pull request, and merge it.
+1. Set the `version` substitution to the new version, for example `"0.2.0"`, in a pull request, and merge it.
 2. Tag the merged commit on `main` with that version and a leading `v`, and push the tag:
 
    ```sh
@@ -134,9 +134,10 @@ To cut a release:
 The `release` workflow then:
 
 1. refuses a tag that is not on `main` (the branch is protected, tags are not);
-2. refuses a tag that does not equal `esphome.project.version` (`v0.2.0` or `0.2.0` against `"0.2.0"`), so the
-   firmware cannot report a different version than the release it came from. A prerelease tag such as
-   `v0.2.0-rc1` needs the version `"0.2.0-rc1"` in the file;
+2. resolves `esphome.project.version` (a `${version}` reference from the `substitutions:` block) and refuses a
+   tag that does not equal it (`v0.2.0` or `0.2.0` against `"0.2.0"`), so the firmware cannot report a different
+   version than the release it came from. A prerelease tag such as `v0.2.0-rc1` needs the version
+   `"0.2.0-rc1"` in the file;
 3. builds the bundle and proves it installs: it copies `secrets.yaml.example`, swaps in a generated API key and
    runs `esphome config` from the bundle folder, so an example that misses a secret the config needs fails here;
 4. creates a **draft** release with generated notes and attaches the zip and checksum.

@@ -29,9 +29,9 @@ Do this before connecting the C3.
 
 The unit this project was built with reads: firmware `QR701_T1US-N32-2008`, interface **USB & TTL**, **9600 baud**,
 code page PC936 (GB18030). Its full self-test readout and every measured deviation from the manual are in the
-Development Guide, [The unit used here](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Development-Guide#the-unit-used-here-self-test-page-2026-09-28).
+Development Guide, [The unit used here](https://github.com/Ajimaru/QR204-Printer-Bridge/wiki/Development-Guide#the-unit-used-here-self-test-page).
 
-The TX level is not on the self-test page. Measured on this unit (2026-09-29, printer on 9 V, idle): TX and RX
+The TX level is not on the self-test page. Measured on this unit with the printer on 9 V and idle: TX and RX
 both at 3.3 V, i.e. 3.3 V TTL. It connects directly to the C3, no divider, no MAX3232.
 
 ## Step 2: power supply and wiring
