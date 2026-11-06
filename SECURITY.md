@@ -13,11 +13,8 @@ branch, and you update by re-flashing the device (over the air from ESPHome Devi
 
 ## Reporting a vulnerability
 
-Report security problems privately, not as a public issue:
-
-- Preferably through GitHub's **Security → Report a vulnerability** form (private vulnerability reporting), if
-  this repository has it enabled.
-- Otherwise by email to **ajimaru_gdr@pm.me**, with "QR204 printer bridge" in the subject.
+Report security problems privately, not as a public issue: use GitHub's **Security → Report a vulnerability**
+form (private vulnerability reporting).
 
 Please include what the issue allows an attacker to do, which file or entity it concerns, and the steps to
 reproduce it. This is a spare-time project, so expect a first answer within about two weeks. There is no bug
@@ -76,9 +73,10 @@ up while the main network is down.
 
 ### Logs
 
-`logger: level: DEBUG` is verbose. The log (web UI log panel, USB serial, HA) shows job sizes, printer status
-and the text passed to `print_text`, so printed content can appear in logs. It does not print the WiFi
-password or the API key. Lower the level to `INFO` or `WARN` if the log is visible to others.
+The log (web UI log panel, USB serial, HA) shows job sizes, printer status and the text passed to
+`print_text`, so printed content can appear in logs. It does not print the WiFi password or the API key. The
+config ships at `level: INFO`; switch to `DEBUG` only while troubleshooting, and to `WARN` if the log is
+visible to others.
 
 ### Secrets in this repository
 
